@@ -13,7 +13,7 @@ class CertificateGenerator:
     def __init__(self, root):
         self.root = root
         self.root.title("Генератор сертификатов")
-        self.root.geometry("1200x800")
+        self.root.geometry("1200x800")  # Размер окна по умолчанию: 1200px ширина, 800px высота
         
         # Переменные для хранения файлов
         self.template_path = None
@@ -51,9 +51,9 @@ class CertificateGenerator:
         self.text_padding_bottom = tk.IntVar(value=10)
         
         # Настройки окна
-        self.window_width = tk.IntVar(value=1400)
+        self.window_width = tk.IntVar(value=1200)  # Ширина окна по умолчанию: 1200px
         self.window_height = tk.IntVar(value=800)
-        self.left_panel_width = tk.IntVar(value=600)
+        self.left_panel_width = tk.IntVar(value=400)  # Ширина левой панели по умолчанию: 400px (33% от 1200px)
         
         # Настройки шрифта
         self.font_size = tk.IntVar(value=50)
@@ -105,16 +105,27 @@ class CertificateGenerator:
         main_frame = ttk.Frame(self.root)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # Левая панель с настройками и прокруткой
-        left_frame = ttk.Frame(main_frame)
-        left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
-        left_frame.configure(width=600)  # Устанавливаем минимальную ширину
-        self.left_panel = left_frame  # Сохраняем ссылку для обновления
+        # Разделитель между панелями (PanedWindow)
+        self.paned_window = ttk.PanedWindow(main_frame, orient=tk.HORIZONTAL)
+        self.paned_window.pack(fill=tk.BOTH, expand=True)
         
-        # Создаем Canvas и Scrollbar для прокрутки
+        # ШИРИНА ПОЛЯ НАСТРОЕК: здесь задается начальная ширина левой панели (400px = 33% от 1200px)
+        # Левая панель с настройками и прокруткой
+        left_frame = ttk.Frame(self.paned_window, width=600)
+        left_frame.pack_propagate(False)  # Запрещаем изменение размера содержимым
+        self.left_panel = left_frame  # Сохраняем ссылку для обновления
+        self.paned_window.add(left_frame, weight=1)  # Левая панель: меньший приоритет (33%)
+        
+        # Создаем Canvas и Scrollbar для прокрутки (вертикальная + горизонтальная)
         canvas = tk.Canvas(left_frame)
-        scrollbar = ttk.Scrollbar(left_frame, orient="vertical", command=canvas.yview)
+        v_scrollbar = ttk.Scrollbar(left_frame, orient="vertical", command=canvas.yview)
+        h_scrollbar = ttk.Scrollbar(left_frame, orient="horizontal", command=canvas.xview)
         scrollable_frame = ttk.Frame(canvas)
+        
+        # ШИРИНА КОНТЕНТА: здесь задается ширина содержимого панели настроек (1000px)
+        # Устанавливаем минима# ШИРИНА КОНТЕНТА: здесь задается ширина содержимого панели настроек (1000px)
+        # льную ширину для горизонтальной прокрутки
+        scrollable_frame.configure(width=1000)
         
         scrollable_frame.bind(
             "<Configure>",
@@ -122,28 +133,39 @@ class CertificateGenerator:
         )
         
         canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
         
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True, padx=(0, 5))  # Добавляем отступ справа
+        v_scrollbar.pack(side="right", fill="y")
+        h_scrollbar.pack(side="bottom", fill="x")
         
         # Привязываем колесо мыши к прокрутке
         def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            if event.state & 0x1:  # Shift + колесо = горизонтальная прокрутка
+                canvas.xview_scroll(int(-1*(event.delta/120)), "units")
+            else:  # Обычное колесо = вертикальная прокрутка
+                canvas.yview_scroll(int(-1*(event.delta/120)), "units")
         canvas.bind_all("<MouseWheel>", _on_mousewheel)
         
         # Принудительно обновляем размер левой панели
         left_frame.update_idletasks()
-        left_frame.configure(width=400)
         
         # Правая панель с предварительным просмотром
-        right_frame = ttk.Frame(main_frame)
-        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+        # ШИРИНА ПРАВОЙ ПАНЕЛИ: здесь задается начальная ширина правой панели (800px = 67% от 1200px)
+        right_frame = ttk.Frame(self.paned_window, width=800)
+        right_frame.pack_propagate(False)  # Запрещаем изменение размера содержимым
+        self.paned_window.add(right_frame, weight=2)  # Правая панель: больший приоритет (67%)
         
         # Заголовок
         title_label = ttk.Label(scrollable_frame, text="Генератор сертификатов", 
-                               font=("Arial", 16, "bold"))
-        title_label.pack(pady=(0, 20))
+                              font=("Arial", 16, "bold"))
+        title_label.pack(pady=(0, 10))
+        
+        # Инструкция по прокрутке
+        scroll_info_label = ttk.Label(scrollable_frame, 
+                                    text="💡 Shift + колесо мыши = горизонтальная прокрутка",
+                                    font=("Arial", 9, "italic"), foreground="blue")
+        scroll_info_label.pack(pady=(0, 10))
         
         # Секция загрузки файлов
         files_frame = ttk.LabelFrame(scrollable_frame, text="Файлы", padding="10")
@@ -230,7 +252,7 @@ class CertificateGenerator:
         x_scale = ttk.Scale(h_frame, from_=0, to=1000, orient=tk.HORIZONTAL, 
                            length=200, variable=self.text_area_x1, command=self.on_area_scale_change)
         x_scale.pack(side=tk.LEFT, padx=(5, 5), fill=tk.X, expand=True)
-        ttk.Label(h_frame, textvariable=self.text_area_x1, width=4).pack(side=tk.RIGHT, padx=(0, 15))
+        ttk.Label(h_frame, textvariable=self.text_area_x1, width=4).pack(side=tk.RIGHT, padx=(0, 25))
         
         # Вертикальное позиционирование
         v_frame = ttk.Frame(pos_frame)
@@ -240,7 +262,7 @@ class CertificateGenerator:
         y_scale = ttk.Scale(v_frame, from_=0, to=1000, orient=tk.HORIZONTAL, 
                            length=200, variable=self.text_area_y1, command=self.on_area_scale_change)
         y_scale.pack(side=tk.LEFT, padx=(5, 5), fill=tk.X, expand=True)
-        ttk.Label(v_frame, textvariable=self.text_area_y1, width=4).pack(side=tk.RIGHT, padx=(0, 15))
+        ttk.Label(v_frame, textvariable=self.text_area_y1, width=4).pack(side=tk.RIGHT, padx=(0, 25))
         
         # Размер области
         size_frame = ttk.Frame(area_frame)
@@ -257,7 +279,7 @@ class CertificateGenerator:
                                length=200, command=self.on_width_scale_change)
         width_scale.pack(side=tk.LEFT, padx=(5, 5), fill=tk.X, expand=True)
         width_label = ttk.Label(w_frame, text="200", width=4)
-        width_label.pack(side=tk.RIGHT, padx=(0, 15))
+        width_label.pack(side=tk.RIGHT, padx=(0, 25))
         
         # Высота области
         h_size_frame = ttk.Frame(size_frame)
@@ -268,7 +290,7 @@ class CertificateGenerator:
                                 length=200, command=self.on_height_scale_change)
         height_scale.pack(side=tk.LEFT, padx=(5, 5), fill=tk.X, expand=True)
         height_label = ttk.Label(h_size_frame, text="100", width=4)
-        height_label.pack(side=tk.RIGHT, padx=(0, 15))
+        height_label.pack(side=tk.RIGHT, padx=(0, 25))
         
         # Отступы текста внутри области
         padding_frame = ttk.LabelFrame(area_frame, text="Отступы текста", padding="5")
@@ -282,7 +304,7 @@ class CertificateGenerator:
         left_padding_scale = ttk.Scale(h_padding_frame, from_=0, to=50, orient=tk.HORIZONTAL, 
                                      length=120, variable=self.text_padding_left, command=self.schedule_update)
         left_padding_scale.pack(side=tk.LEFT, padx=(5, 10), fill=tk.X, expand=True)
-        ttk.Label(h_padding_frame, textvariable=self.text_padding_left, width=3).pack(side=tk.RIGHT, padx=(0, 15))
+        ttk.Label(h_padding_frame, textvariable=self.text_padding_left, width=3).pack(side=tk.RIGHT, padx=(0, 25))
         
         # Отступы по вертикали
         v_padding_frame = ttk.Frame(padding_frame)
@@ -292,7 +314,7 @@ class CertificateGenerator:
         right_padding_scale = ttk.Scale(v_padding_frame, from_=0, to=50, orient=tk.HORIZONTAL, 
                                       length=120, variable=self.text_padding_right, command=self.schedule_update)
         right_padding_scale.pack(side=tk.LEFT, padx=(5, 10), fill=tk.X, expand=True)
-        ttk.Label(v_padding_frame, textvariable=self.text_padding_right, width=3).pack(side=tk.RIGHT, padx=(0, 15))
+        ttk.Label(v_padding_frame, textvariable=self.text_padding_right, width=3).pack(side=tk.RIGHT, padx=(0, 25))
         
         # Отступы по вертикали
         v_padding_frame2 = ttk.Frame(padding_frame)
@@ -302,7 +324,7 @@ class CertificateGenerator:
         top_padding_scale = ttk.Scale(v_padding_frame2, from_=0, to=50, orient=tk.HORIZONTAL, 
                                     length=120, variable=self.text_padding_top, command=self.schedule_update)
         top_padding_scale.pack(side=tk.LEFT, padx=(5, 10), fill=tk.X, expand=True)
-        ttk.Label(v_padding_frame2, textvariable=self.text_padding_top, width=3).pack(side=tk.RIGHT, padx=(0, 15))
+        ttk.Label(v_padding_frame2, textvariable=self.text_padding_top, width=3).pack(side=tk.RIGHT, padx=(0, 25))
         
         # Отступы по вертикали
         v_padding_frame3 = ttk.Frame(padding_frame)
@@ -312,7 +334,7 @@ class CertificateGenerator:
         bottom_padding_scale = ttk.Scale(v_padding_frame3, from_=0, to=50, orient=tk.HORIZONTAL, 
                                        length=120, variable=self.text_padding_bottom, command=self.schedule_update)
         bottom_padding_scale.pack(side=tk.LEFT, padx=(5, 10), fill=tk.X, expand=True)
-        ttk.Label(v_padding_frame3, textvariable=self.text_padding_bottom, width=3).pack(side=tk.RIGHT, padx=(0, 15))
+        ttk.Label(v_padding_frame3, textvariable=self.text_padding_bottom, width=3).pack(side=tk.RIGHT, padx=(0, 25))
         
         # Старый способ (точка) - скрыт по умолчанию
         point_frame = ttk.LabelFrame(settings_frame, text="Точка для ФИО", padding="5")
@@ -351,7 +373,7 @@ class CertificateGenerator:
         font_scale = ttk.Scale(font_frame, from_=10, to=200, orient=tk.HORIZONTAL, 
                               length=200, variable=self.font_size, command=self.schedule_update)
         font_scale.pack(side=tk.LEFT, padx=(5, 10), fill=tk.X, expand=True)
-        ttk.Label(font_frame, textvariable=self.font_size, width=4).pack(side=tk.RIGHT, padx=(0, 15))
+        ttk.Label(font_frame, textvariable=self.font_size, width=4).pack(side=tk.RIGHT, padx=(0, 25))
         
         # Цвет шрифта
         color_frame = ttk.Frame(settings_frame)
@@ -369,7 +391,7 @@ class CertificateGenerator:
         spacing_scale = ttk.Scale(spacing_frame, from_=0, to=50, orient=tk.HORIZONTAL, 
                                  length=200, variable=self.line_spacing, command=self.schedule_update)
         spacing_scale.pack(side=tk.LEFT, padx=(5, 0), fill=tk.X, expand=True)
-        ttk.Label(spacing_frame, textvariable=self.line_spacing, width=4).pack(side=tk.RIGHT, padx=(0, 15))
+        ttk.Label(spacing_frame, textvariable=self.line_spacing, width=4).pack(side=tk.RIGHT, padx=(0, 25))
         
         # Привязка событий для автоматического обновления
         self.text_x.trace('w', self.schedule_update)
@@ -403,7 +425,7 @@ class CertificateGenerator:
         window_width_scale = ttk.Scale(size_frame, from_=800, to=2000, orient=tk.HORIZONTAL, 
                                      length=200, variable=self.window_width, command=self.on_window_size_change)
         window_width_scale.pack(side=tk.LEFT, padx=(5, 10), fill=tk.X, expand=True)
-        ttk.Label(size_frame, textvariable=self.window_width, width=4).pack(side=tk.RIGHT, padx=(0, 15))
+        ttk.Label(size_frame, textvariable=self.window_width, width=4).pack(side=tk.RIGHT, padx=(0, 25))
         
         height_frame = ttk.Frame(window_frame)
         height_frame.pack(fill=tk.X, pady=2)
@@ -412,17 +434,17 @@ class CertificateGenerator:
         window_height_scale = ttk.Scale(height_frame, from_=600, to=1200, orient=tk.HORIZONTAL, 
                                       length=200, variable=self.window_height, command=self.on_window_size_change)
         window_height_scale.pack(side=tk.LEFT, padx=(5, 10), fill=tk.X, expand=True)
-        ttk.Label(height_frame, textvariable=self.window_height, width=4).pack(side=tk.RIGHT, padx=(0, 15))
+        ttk.Label(height_frame, textvariable=self.window_height, width=4).pack(side=tk.RIGHT, padx=(0, 25))
         
         # Ширина панели настроек
         panel_frame = ttk.Frame(window_frame)
         panel_frame.pack(fill=tk.X, pady=2)
         
         ttk.Label(panel_frame, text="Ширина панели:").pack(side=tk.LEFT)
-        panel_width_scale = ttk.Scale(panel_frame, from_=300, to=800, orient=tk.HORIZONTAL, 
+        panel_width_scale = ttk.Scale(panel_frame, from_=500, to=1200, orient=tk.HORIZONTAL, 
                                     length=200, variable=self.left_panel_width, command=self.on_panel_width_change)
         panel_width_scale.pack(side=tk.LEFT, padx=(5, 10), fill=tk.X, expand=True)
-        ttk.Label(panel_frame, textvariable=self.left_panel_width, width=4).pack(side=tk.RIGHT, padx=(0, 15))
+        ttk.Label(panel_frame, textvariable=self.left_panel_width, width=4).pack(side=tk.RIGHT, padx=(0, 25))
         
         # Секция сохранения/загрузки настроек
         settings_buttons_frame = ttk.LabelFrame(scrollable_frame, text="Настройки проекта", padding="10")
@@ -452,7 +474,7 @@ class CertificateGenerator:
         self.status_label = ttk.Label(scrollable_frame, text="Готов к работе")
         self.status_label.pack(pady=5)
         
-        # Правая панель с предварительным просмотром
+        # Создаем правую панель с предварительным просмотром
         preview_frame = ttk.LabelFrame(right_frame, text="Предварительный просмотр", padding="10")
         preview_frame.pack(fill=tk.BOTH, expand=True)
         
@@ -477,6 +499,12 @@ class CertificateGenerator:
         self.root.update_idletasks()
         self.root.geometry(f"{self.window_width.get()}x{self.window_height.get()}")
         
+        # Привязываем событие изменения размера окна
+        self.root.bind('<Configure>', self.on_window_configure)
+        
+        # Принудительно обновляем размеры всех панелей
+        self.root.after(100, self.force_update_layout)
+        
     def select_template(self):
         file_path = filedialog.askopenfilename(
             title="Выберите шаблон сертификата",
@@ -499,6 +527,9 @@ class CertificateGenerator:
         """Отображает изображение в canvas с масштабированием"""
         if not self.original_image:
             return
+        
+        # Принудительно обновляем размеры canvas
+        self.canvas.update_idletasks()
             
         # Получаем размеры canvas
         canvas_width = self.canvas.winfo_width()
@@ -925,9 +956,9 @@ class CertificateGenerator:
             self.text_padding_right.set(settings.get("text_padding_right", 10))
             self.text_padding_top.set(settings.get("text_padding_top", 10))
             self.text_padding_bottom.set(settings.get("text_padding_bottom", 10))
-            self.window_width.set(settings.get("window_width", 1400))
+            self.window_width.set(settings.get("window_width", 1800))
             self.window_height.set(settings.get("window_height", 800))
-            self.left_panel_width.set(settings.get("left_panel_width", 600))
+            self.left_panel_width.set(settings.get("left_panel_width", 900))
             self.font_size.set(settings.get("font_size", 50))
             self.font_color.set(settings.get("font_color", "#000000"))
             self.selected_font.set(settings.get("selected_font", "Arial"))
@@ -996,19 +1027,27 @@ class CertificateGenerator:
     def on_window_size_change(self, value):
         """Обновляет размер окна при изменении через ползунки"""
         self.root.geometry(f"{self.window_width.get()}x{self.window_height.get()}")
+        # Принудительно обновляем все панели
+        self.root.update_idletasks()
     
     def on_panel_width_change(self, value):
         """Обновляет ширину левой панели при изменении через ползунок"""
-        # Используем сохраненную ссылку на левую панель
-        if hasattr(self, 'left_panel'):
-            new_width = self.left_panel_width.get()
-            self.left_panel.configure(width=new_width)
-            # Принудительно обновляем интерфейс
+        # PanedWindow автоматически управляет размерами
+        pass
+    
+    def on_window_configure(self, event):
+        """Обработчик изменения размера окна"""
+        # PanedWindow автоматически управляет размерами панелей
+        if event.widget == self.root:
             self.root.update_idletasks()
-            # Обновляем размер окна, чтобы панель поместилась
-            current_width = self.root.winfo_width()
-            if current_width < new_width + 200:  # +200 для правой панели
-                self.root.geometry(f"{new_width + 200}x{self.window_height.get()}")
+    
+    def force_update_layout(self):
+        """Принудительно обновляет макет всех панелей"""
+        self.root.update_idletasks()
+    
+    def force_update_right_panel(self):
+        """Принудительно обновляет правую панель"""
+        self.root.update_idletasks()
             
     def calculate_text_position(self, text, font, alignment):
         """Вычисляет позицию текста в зависимости от выравнивания"""
